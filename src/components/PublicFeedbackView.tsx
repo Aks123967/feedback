@@ -312,14 +312,6 @@ export const PublicFeedbackView: React.FC<PublicFeedbackViewProps> = ({ isWidget
         </div>
       )}
 
-      <div className="mt-6 text-center">
-        <div className="flex items-center justify-center space-x-2 text-gray-400">
-          <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center">
-            <span className="text-xs font-bold">A</span>
-          </div>
-          <span className="text-sm">AnnounceKit</span>
-        </div>
-      </div>
     </div>
   );
 };
