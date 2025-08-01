@@ -20,7 +20,7 @@ interface PublicFeedbackViewProps {
 }
 
 export const PublicFeedbackView: React.FC<PublicFeedbackViewProps> = ({ isWidget = false, apiKey }) => {
-  const { featureRequests, addFeatureRequest, addUpvote, addComment } = useFeedbackData();
+  const { featureRequests, labels, addFeatureRequest, addUpvote, addComment } = useFeedbackData();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRequest, setSelectedRequest] = useState<FeatureRequest | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -28,6 +28,7 @@ export const PublicFeedbackView: React.FC<PublicFeedbackViewProps> = ({ isWidget
   const [formData, setFormData] = useState({
     title: '',
     description: '',
+    selectedLabelId: '',
   });
 
   // Update selected request when featureRequests change
@@ -68,15 +69,18 @@ export const PublicFeedbackView: React.FC<PublicFeedbackViewProps> = ({ isWidget
       return;
     }
 
+    const selectedLabel = formData.selectedLabelId 
+      ? labels.find(label => label.id === formData.selectedLabelId)
+      : null;
     addFeatureRequest({
       title: formData.title,
       summary: formData.description,
       status: 'public',
       author: 'Anonymous User',
-      labels: [],
+      labels: selectedLabel ? [selectedLabel] : [],
     });
 
-    setFormData({ title: '', description: '' });
+    setFormData({ title: '', description: '', selectedLabelId: '' });
     setShowCreateForm(false);
   };
 
@@ -133,8 +137,17 @@ export const PublicFeedbackView: React.FC<PublicFeedbackViewProps> = ({ isWidget
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
-            <select className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-              <option>Add Category</option>
+            <select 
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              value={formData.selectedLabelId}
+              onChange={(e) => setFormData(prev => ({ ...prev, selectedLabelId: e.target.value }))}
+            >
+              <option value="">Select Category (Optional)</option>
+              {labels.map(label => (
+                <option key={label.id} value={label.id}>
+                  {label.name}
+                </option>
+              ))}
             </select>
           </div>
 
