@@ -437,23 +437,9 @@
     if (!content) return;
     
     try {
-      var iframe = document.createElement('iframe');
-      var baseUrl = window.location.protocol + '//' + window.location.host;
-      iframe.src = baseUrl + '/widget?apiKey=' + this.config.apiKey + '&theme=' + this.config.theme;
-      iframe.style.width = '100%';
-      iframe.style.height = '100%';
-      iframe.style.border = 'none';
-      iframe.style.background = 'white';
-      
-      content.innerHTML = '';
-      content.appendChild(iframe);
-      
-      var self = this;
-      window.addEventListener('message', function(event) {
-        if (event.data.type === 'feedback-widget-close') {
-          self.closeWidget();
-        }
-      });
+      // Load content directly without iframe to avoid CORS issues
+      content.innerHTML = this.getFeedbackContentHTML();
+      this.addFeedbackEventListeners();
       
     } catch (error) {
       content.innerHTML = [
@@ -463,6 +449,221 @@
         '</div>'
       ].join('');
     }
+  };
+
+  FeedbackSDK.prototype.getFeedbackContentHTML = function() {
+    return [
+      '<div class="feedback-widget-content">',
+        '<div class="feedback-search-bar">',
+          '<input type="text" class="feedback-search-input" placeholder="Search ideas..." id="feedback-search">',
+          '<button class="feedback-add-button" id="feedback-add-btn">+</button>',
+        '</div>',
+        '<div class="feedback-list" id="feedback-list">',
+          this.getFeedbackListHTML(),
+        '</div>',
+      '</div>',
+      '<div class="feedback-form" id="feedback-form" style="display: none;">',
+        '<div class="feedback-form-header">',
+          '<button class="feedback-back-button" id="feedback-back-btn">← Back</button>',
+          '<h3>Share Idea</h3>',
+        '</div>',
+        '<input type="text" class="feedback-input" placeholder="Title" id="feedback-title">',
+        '<textarea class="feedback-textarea" placeholder="Describe your idea" id="feedback-description"></textarea>',
+        '<select class="feedback-input" id="feedback-category">',
+          '<option value="">Select Category (Optional)</option>',
+          '<option value="feature">Feature</option>',
+          '<option value="improvement">Improvement</option>',
+          '<option value="bug">Bug Fix</option>',
+          '<option value="announcement">Announcement</option>',
+        '</select>',
+        '<div class="feedback-form-actions">',
+          '<button class="feedback-cancel-button" id="feedback-cancel-btn">Cancel</button>',
+          '<button class="feedback-submit-button" id="feedback-submit-btn">Create</button>',
+        '</div>',
+      '</div>'
+    ].join('');
+  };
+
+  FeedbackSDK.prototype.getFeedbackListHTML = function() {
+    // Mock data for demonstration - replace with API call in production
+    var mockFeedback = [
+      {
+        id: '1',
+        title: 'Add dark mode support',
+        description: 'Would love to have a dark theme option for better user experience during night time usage.',
+        upvotes: 15,
+        comments: 3,
+        category: 'feature',
+        timeAgo: '2 days ago'
+      },
+      {
+        id: '2',
+        title: 'Mobile app version',
+        description: 'Create a mobile application for iOS and Android platforms.',
+        upvotes: 8,
+        comments: 1,
+        category: 'feature',
+        timeAgo: '1 week ago'
+      },
+      {
+        id: '3',
+        title: 'Improve loading speed',
+        description: 'The application takes too long to load on slower connections.',
+        upvotes: 12,
+        comments: 5,
+        category: 'improvement',
+        timeAgo: '3 days ago'
+      }
+    ];
+
+    return mockFeedback.map(function(item) {
+      return [
+        '<div class="feedback-item" data-id="' + item.id + '">',
+          '<div class="feedback-vote">',
+            '<button class="feedback-upvote-btn" data-id="' + item.id + '">▲</button>',
+            '<div class="feedback-vote-count">' + item.upvotes + '</div>',
+          '</div>',
+          '<div class="feedback-content">',
+            '<h3 class="feedback-title">' + item.title + '</h3>',
+            '<p class="feedback-description">' + item.description + '</p>',
+            '<div class="feedback-meta">',
+              item.timeAgo + ' • ' + item.comments + ' comments',
+              item.category ? ' • ' + item.category : '',
+            '</div>',
+          '</div>',
+        '</div>'
+      ].join('');
+    }).join('');
+  };
+
+  FeedbackSDK.prototype.addFeedbackEventListeners = function() {
+    var self = this;
+    
+    // Search functionality
+    var searchInput = document.getElementById('feedback-search');
+    if (searchInput) {
+      searchInput.addEventListener('input', function(e) {
+        self.filterFeedback(e.target.value);
+      });
+    }
+
+    // Add button
+    var addBtn = document.getElementById('feedback-add-btn');
+    if (addBtn) {
+      addBtn.addEventListener('click', function() {
+        self.showFeedbackForm();
+      });
+    }
+
+    // Upvote buttons
+    var upvoteButtons = document.querySelectorAll('.feedback-upvote-btn');
+    upvoteButtons.forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        self.handleUpvote(this.getAttribute('data-id'));
+      });
+    });
+
+    // Form handlers
+    var backBtn = document.getElementById('feedback-back-btn');
+    var cancelBtn = document.getElementById('feedback-cancel-btn');
+    var submitBtn = document.getElementById('feedback-submit-btn');
+
+    if (backBtn) {
+      backBtn.addEventListener('click', function() {
+        self.showFeedbackList();
+      });
+    }
+
+    if (cancelBtn) {
+      cancelBtn.addEventListener('click', function() {
+        self.showFeedbackList();
+      });
+    }
+
+    if (submitBtn) {
+      submitBtn.addEventListener('click', function() {
+        self.handleSubmitFeedback();
+      });
+    }
+  };
+
+  FeedbackSDK.prototype.filterFeedback = function(searchTerm) {
+    var items = document.querySelectorAll('.feedback-item');
+    var term = searchTerm.toLowerCase();
+    
+    items.forEach(function(item) {
+      var title = item.querySelector('.feedback-title').textContent.toLowerCase();
+      var description = item.querySelector('.feedback-description').textContent.toLowerCase();
+      
+      if (title.includes(term) || description.includes(term)) {
+        item.style.display = 'flex';
+      } else {
+        item.style.display = 'none';
+      }
+    });
+  };
+
+  FeedbackSDK.prototype.showFeedbackForm = function() {
+    var list = document.getElementById('feedback-list');
+    var form = document.getElementById('feedback-form');
+    
+    if (list) list.style.display = 'none';
+    if (form) form.style.display = 'block';
+  };
+
+  FeedbackSDK.prototype.showFeedbackList = function() {
+    var list = document.getElementById('feedback-list');
+    var form = document.getElementById('feedback-form');
+    
+    if (list) list.style.display = 'block';
+    if (form) form.style.display = 'none';
+    
+    // Clear form
+    var titleInput = document.getElementById('feedback-title');
+    var descInput = document.getElementById('feedback-description');
+    var categorySelect = document.getElementById('feedback-category');
+    
+    if (titleInput) titleInput.value = '';
+    if (descInput) descInput.value = '';
+    if (categorySelect) categorySelect.value = '';
+  };
+
+  FeedbackSDK.prototype.handleUpvote = function(feedbackId) {
+    // In production, this would make an API call
+    console.log('Upvoting feedback:', feedbackId);
+    
+    // Update UI optimistically
+    var btn = document.querySelector('.feedback-upvote-btn[data-id="' + feedbackId + '"]');
+    if (btn) {
+      var countEl = btn.parentNode.querySelector('.feedback-vote-count');
+      if (countEl) {
+        var currentCount = parseInt(countEl.textContent) || 0;
+        countEl.textContent = currentCount + 1;
+      }
+    }
+  };
+
+  FeedbackSDK.prototype.handleSubmitFeedback = function() {
+    var titleInput = document.getElementById('feedback-title');
+    var descInput = document.getElementById('feedback-description');
+    var categorySelect = document.getElementById('feedback-category');
+    
+    var title = titleInput ? titleInput.value.trim() : '';
+    var description = descInput ? descInput.value.trim() : '';
+    var category = categorySelect ? categorySelect.value : '';
+    
+    if (!title || !description) {
+      alert('Please fill in both title and description');
+      return;
+    }
+    
+    // In production, this would make an API call
+    console.log('Submitting feedback:', { title: title, description: description, category: category });
+    
+    // Show success message and return to list
+    alert('Thank you for your feedback!');
+    this.showFeedbackList();
   };
 
   // Public methods
