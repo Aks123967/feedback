@@ -16,6 +16,10 @@
     
     this.widget = null;
     this.isOpen = false;
+    this.feedbackData = [];
+    this.labels = [];
+    this.currentView = 'list'; // 'list', 'form', 'detail'
+    this.selectedFeedback = null;
     
     this.init();
   }
@@ -39,6 +43,7 @@
     this.addStyles();
     document.body.appendChild(this.widget);
     this.addEventListeners();
+    this.loadLabels();
   };
 
   FeedbackSDK.prototype.getWidgetHTML = function() {
@@ -264,7 +269,7 @@
         'font-size: 14px;',
       '}',
       
-      '.feedback-content {',
+      '.feedback-content-text {',
         'flex: 1;',
       '}',
       
@@ -286,6 +291,26 @@
         'font-size: 11px;',
         'color: #9ca3af;',
       '}',
+      
+      '.feedback-labels {',
+        'display: flex;',
+        'gap: 4px;',
+        'margin-top: 4px;',
+      '}',
+      
+      '.feedback-label {',
+        'padding: 2px 6px;',
+        'border-radius: 12px;',
+        'font-size: 10px;',
+        'font-weight: 500;',
+      '}',
+      
+      '.feedback-label-red { background: #fee2e2; color: #dc2626; }',
+      '.feedback-label-blue { background: #dbeafe; color: #2563eb; }',
+      '.feedback-label-green { background: #dcfce7; color: #16a34a; }',
+      '.feedback-label-yellow { background: #fef3c7; color: #d97706; }',
+      '.feedback-label-purple { background: #f3e8ff; color: #9333ea; }',
+      '.feedback-label-gray { background: #f3f4f6; color: #6b7280; }',
       
       '.feedback-form {',
         'padding: 16px;',
@@ -312,7 +337,7 @@
         'font-weight: 600;',
       '}',
       
-      '.feedback-input, .feedback-textarea {',
+      '.feedback-input, .feedback-textarea, .feedback-select {',
         'width: 100%;',
         'padding: 8px 12px;',
         'border: 1px solid #e5e7eb;',
@@ -432,49 +457,196 @@
     }
   };
 
+  // Load labels from localStorage (synced with main app)
+  FeedbackSDK.prototype.loadLabels = function() {
+    try {
+      // Default labels that match the main app
+      this.labels = [
+        { id: '1', name: 'FIX', color: 'red' },
+        { id: '2', name: 'ANNOUNCEMENT', color: 'blue' },
+        { id: '3', name: 'IMPROVEMENT', color: 'green' },
+        { id: '4', name: 'FEATURE', color: 'purple' },
+        { id: '5', name: 'BUG', color: 'yellow' }
+      ];
+    } catch (error) {
+      console.error('Error loading labels:', error);
+    }
+  };
+
+  // Load feedback data from localStorage (synced with main app)
+  FeedbackSDK.prototype.loadFeedbackData = function() {
+    try {
+      var stored = localStorage.getItem('feedback-requests');
+      if (stored) {
+        var parsed = JSON.parse(stored);
+        // Filter only public requests
+        this.feedbackData = parsed.filter(function(req) {
+          return req.status === 'public';
+        }).map(function(req) {
+          return {
+            id: req.id,
+            title: req.title,
+            summary: req.summary,
+            upvotes: req.upvotes || [],
+            comments: (req.comments || []).filter(function(comment) {
+              return comment.isPublic;
+            }),
+            labels: req.labels || [],
+            createdAt: new Date(req.createdAt),
+            author: req.author
+          };
+        });
+      } else {
+        this.feedbackData = [];
+      }
+    } catch (error) {
+      console.error('Error loading feedback data:', error);
+      this.feedbackData = [];
+    }
+  };
+
+  // Save feedback data to localStorage (synced with main app)
+  FeedbackSDK.prototype.saveFeedbackData = function(newFeedback) {
+    try {
+      var stored = localStorage.getItem('feedback-requests');
+      var allFeedback = stored ? JSON.parse(stored) : [];
+      
+      // Add new feedback
+      allFeedback.unshift(newFeedback);
+      
+      // Save back to localStorage
+      localStorage.setItem('feedback-requests', JSON.stringify(allFeedback));
+      
+      // Reload our filtered data
+      this.loadFeedbackData();
+    } catch (error) {
+      console.error('Error saving feedback data:', error);
+    }
+  };
+
+  // Update upvote in localStorage
+  FeedbackSDK.prototype.updateUpvote = function(feedbackId) {
+    try {
+      var stored = localStorage.getItem('feedback-requests');
+      if (!stored) return;
+      
+      var allFeedback = JSON.parse(stored);
+      var feedbackIndex = allFeedback.findIndex(function(req) {
+        return req.id === feedbackId;
+      });
+      
+      if (feedbackIndex !== -1) {
+        var newUpvote = {
+          id: Date.now().toString(),
+          userId: 'widget-user-' + Date.now(),
+          userName: 'Anonymous User',
+          createdAt: new Date().toISOString()
+        };
+        
+        if (!allFeedback[feedbackIndex].upvotes) {
+          allFeedback[feedbackIndex].upvotes = [];
+        }
+        
+        allFeedback[feedbackIndex].upvotes.push(newUpvote);
+        allFeedback[feedbackIndex].updatedAt = new Date().toISOString();
+        
+        localStorage.setItem('feedback-requests', JSON.stringify(allFeedback));
+        this.loadFeedbackData();
+      }
+    } catch (error) {
+      console.error('Error updating upvote:', error);
+    }
+  };
+
   FeedbackSDK.prototype.loadFeedbackContent = function() {
     var content = document.getElementById('feedback-content');
     if (!content) return;
     
-    try {
-      // Load content directly without iframe to avoid CORS issues
-      content.innerHTML = this.getFeedbackContentHTML();
-      this.addFeedbackEventListeners();
-      
-    } catch (error) {
-      content.innerHTML = [
-        '<div style="padding: 20px; text-align: center; color: #ef4444;">',
-          '<p>Failed to load feedback widget</p>',
-          '<p style="font-size: 14px; color: #6b7280;">Please check your API key</p>',
-        '</div>'
-      ].join('');
-    }
+    this.loadFeedbackData();
+    this.showFeedbackList();
   };
 
-  FeedbackSDK.prototype.getFeedbackContentHTML = function() {
-    return [
+  FeedbackSDK.prototype.showFeedbackList = function() {
+    var content = document.getElementById('feedback-content');
+    if (!content) return;
+    
+    this.currentView = 'list';
+    content.innerHTML = this.getFeedbackListHTML();
+    this.addFeedbackEventListeners();
+  };
+
+  FeedbackSDK.prototype.getFeedbackListHTML = function() {
+    var self = this;
+    
+    var html = [
       '<div class="feedback-widget-content">',
         '<div class="feedback-search-bar">',
           '<input type="text" class="feedback-search-input" placeholder="Search ideas..." id="feedback-search">',
           '<button class="feedback-add-button" id="feedback-add-btn">+</button>',
         '</div>',
-        '<div class="feedback-list" id="feedback-list">',
-          this.getFeedbackListHTML(),
-        '</div>',
-      '</div>',
-      '<div class="feedback-form" id="feedback-form" style="display: none;">',
+        '<div class="feedback-list" id="feedback-list">'
+    ];
+
+    if (this.feedbackData.length === 0) {
+      html.push('<div class="feedback-empty">No feedback found. Be the first to share an idea!</div>');
+    } else {
+      this.feedbackData.forEach(function(item) {
+        var timeAgo = self.formatTimeAgo(item.createdAt);
+        var labelsHtml = '';
+        
+        if (item.labels && item.labels.length > 0) {
+          labelsHtml = '<div class="feedback-labels">';
+          item.labels.forEach(function(label) {
+            labelsHtml += '<span class="feedback-label feedback-label-' + label.color + '">' + label.name + '</span>';
+          });
+          labelsHtml += '</div>';
+        }
+
+        html.push([
+          '<div class="feedback-item" data-id="' + item.id + '">',
+            '<div class="feedback-vote">',
+              '<button class="feedback-upvote-btn" data-id="' + item.id + '">▲</button>',
+              '<div class="feedback-vote-count">' + (item.upvotes ? item.upvotes.length : 0) + '</div>',
+            '</div>',
+            '<div class="feedback-content-text">',
+              '<h3 class="feedback-title">' + this.escapeHtml(item.title) + '</h3>',
+              '<p class="feedback-description">' + this.escapeHtml(item.summary) + '</p>',
+              '<div class="feedback-meta">',
+                timeAgo + ' • ' + (item.comments ? item.comments.length : 0) + ' comments',
+              '</div>',
+              labelsHtml,
+            '</div>',
+          '</div>'
+        ].join(''));
+      });
+    }
+
+    html.push('</div></div>');
+    return html.join('');
+  };
+
+  FeedbackSDK.prototype.showFeedbackForm = function() {
+    var content = document.getElementById('feedback-content');
+    if (!content) return;
+    
+    this.currentView = 'form';
+    
+    var labelsOptions = '';
+    this.labels.forEach(function(label) {
+      labelsOptions += '<option value="' + label.id + '">' + label.name + '</option>';
+    });
+
+    content.innerHTML = [
+      '<div class="feedback-form">',
         '<div class="feedback-form-header">',
           '<button class="feedback-back-button" id="feedback-back-btn">← Back</button>',
           '<h3>Share Idea</h3>',
         '</div>',
-        '<input type="text" class="feedback-input" placeholder="Title" id="feedback-title">',
-        '<textarea class="feedback-textarea" placeholder="Describe your idea" id="feedback-description"></textarea>',
-        '<select class="feedback-input" id="feedback-category">',
+        '<input type="text" class="feedback-input" placeholder="Title" id="feedback-title" required>',
+        '<textarea class="feedback-textarea" placeholder="Describe your idea" id="feedback-description" rows="4" required></textarea>',
+        '<select class="feedback-select" id="feedback-category">',
           '<option value="">Select Category (Optional)</option>',
-          '<option value="feature">Feature</option>',
-          '<option value="improvement">Improvement</option>',
-          '<option value="bug">Bug Fix</option>',
-          '<option value="announcement">Announcement</option>',
+          labelsOptions,
         '</select>',
         '<div class="feedback-form-actions">',
           '<button class="feedback-cancel-button" id="feedback-cancel-btn">Cancel</button>',
@@ -482,58 +654,8 @@
         '</div>',
       '</div>'
     ].join('');
-  };
-
-  FeedbackSDK.prototype.getFeedbackListHTML = function() {
-    // Mock data for demonstration - replace with API call in production
-    var mockFeedback = [
-      {
-        id: '1',
-        title: 'Add dark mode support',
-        description: 'Would love to have a dark theme option for better user experience during night time usage.',
-        upvotes: 15,
-        comments: 3,
-        category: 'feature',
-        timeAgo: '2 days ago'
-      },
-      {
-        id: '2',
-        title: 'Mobile app version',
-        description: 'Create a mobile application for iOS and Android platforms.',
-        upvotes: 8,
-        comments: 1,
-        category: 'feature',
-        timeAgo: '1 week ago'
-      },
-      {
-        id: '3',
-        title: 'Improve loading speed',
-        description: 'The application takes too long to load on slower connections.',
-        upvotes: 12,
-        comments: 5,
-        category: 'improvement',
-        timeAgo: '3 days ago'
-      }
-    ];
-
-    return mockFeedback.map(function(item) {
-      return [
-        '<div class="feedback-item" data-id="' + item.id + '">',
-          '<div class="feedback-vote">',
-            '<button class="feedback-upvote-btn" data-id="' + item.id + '">▲</button>',
-            '<div class="feedback-vote-count">' + item.upvotes + '</div>',
-          '</div>',
-          '<div class="feedback-content">',
-            '<h3 class="feedback-title">' + item.title + '</h3>',
-            '<p class="feedback-description">' + item.description + '</p>',
-            '<div class="feedback-meta">',
-              item.timeAgo + ' • ' + item.comments + ' comments',
-              item.category ? ' • ' + item.category : '',
-            '</div>',
-          '</div>',
-        '</div>'
-      ].join('');
-    }).join('');
+    
+    this.addFormEventListeners();
   };
 
   FeedbackSDK.prototype.addFeedbackEventListeners = function() {
@@ -564,7 +686,19 @@
       });
     });
 
-    // Form handlers
+    // Feedback item clicks
+    var feedbackItems = document.querySelectorAll('.feedback-item');
+    feedbackItems.forEach(function(item) {
+      item.addEventListener('click', function() {
+        var feedbackId = this.getAttribute('data-id');
+        self.showFeedbackDetail(feedbackId);
+      });
+    });
+  };
+
+  FeedbackSDK.prototype.addFormEventListeners = function() {
+    var self = this;
+    
     var backBtn = document.getElementById('feedback-back-btn');
     var cancelBtn = document.getElementById('feedback-cancel-btn');
     var submitBtn = document.getElementById('feedback-submit-btn');
@@ -604,34 +738,8 @@
     });
   };
 
-  FeedbackSDK.prototype.showFeedbackForm = function() {
-    var list = document.getElementById('feedback-list');
-    var form = document.getElementById('feedback-form');
-    
-    if (list) list.style.display = 'none';
-    if (form) form.style.display = 'block';
-  };
-
-  FeedbackSDK.prototype.showFeedbackList = function() {
-    var list = document.getElementById('feedback-list');
-    var form = document.getElementById('feedback-form');
-    
-    if (list) list.style.display = 'block';
-    if (form) form.style.display = 'none';
-    
-    // Clear form
-    var titleInput = document.getElementById('feedback-title');
-    var descInput = document.getElementById('feedback-description');
-    var categorySelect = document.getElementById('feedback-category');
-    
-    if (titleInput) titleInput.value = '';
-    if (descInput) descInput.value = '';
-    if (categorySelect) categorySelect.value = '';
-  };
-
   FeedbackSDK.prototype.handleUpvote = function(feedbackId) {
-    // In production, this would make an API call
-    console.log('Upvoting feedback:', feedbackId);
+    this.updateUpvote(feedbackId);
     
     // Update UI optimistically
     var btn = document.querySelector('.feedback-upvote-btn[data-id="' + feedbackId + '"]');
@@ -651,19 +759,136 @@
     
     var title = titleInput ? titleInput.value.trim() : '';
     var description = descInput ? descInput.value.trim() : '';
-    var category = categorySelect ? categorySelect.value : '';
+    var categoryId = categorySelect ? categorySelect.value : '';
     
     if (!title || !description) {
       alert('Please fill in both title and description');
       return;
     }
     
-    // In production, this would make an API call
-    console.log('Submitting feedback:', { title: title, description: description, category: category });
+    var selectedLabel = null;
+    if (categoryId) {
+      selectedLabel = this.labels.find(function(label) {
+        return label.id === categoryId;
+      });
+    }
     
-    // Show success message and return to list
+    var newFeedback = {
+      id: Date.now().toString(),
+      title: title,
+      summary: description,
+      status: 'public',
+      author: 'Anonymous User',
+      labels: selectedLabel ? [selectedLabel] : [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      upvotes: [],
+      comments: []
+    };
+    
+    this.saveFeedbackData(newFeedback);
     alert('Thank you for your feedback!');
     this.showFeedbackList();
+  };
+
+  FeedbackSDK.prototype.showFeedbackDetail = function(feedbackId) {
+    var feedback = this.feedbackData.find(function(item) {
+      return item.id === feedbackId;
+    });
+    
+    if (!feedback) return;
+    
+    this.selectedFeedback = feedback;
+    this.currentView = 'detail';
+    
+    var content = document.getElementById('feedback-content');
+    if (!content) return;
+    
+    var timeAgo = this.formatTimeAgo(feedback.createdAt);
+    var labelsHtml = '';
+    
+    if (feedback.labels && feedback.labels.length > 0) {
+      labelsHtml = '<div class="feedback-labels">';
+      feedback.labels.forEach(function(label) {
+        labelsHtml += '<span class="feedback-label feedback-label-' + label.color + '">' + label.name + '</span>';
+      });
+      labelsHtml += '</div>';
+    }
+
+    var commentsHtml = '';
+    if (feedback.comments && feedback.comments.length > 0) {
+      commentsHtml = '<div style="margin-top: 16px;"><h4 style="margin-bottom: 8px;">Comments</h4>';
+      feedback.comments.forEach(function(comment) {
+        var commentTime = new Date(comment.createdAt);
+        commentsHtml += [
+          '<div style="background: #f9fafb; padding: 12px; border-radius: 8px; margin-bottom: 8px;">',
+            '<div style="font-weight: 600; font-size: 12px; color: #374151; margin-bottom: 4px;">' + comment.author + '</div>',
+            '<div style="font-size: 14px; color: #6b7280;">' + comment.content + '</div>',
+            '<div style="font-size: 11px; color: #9ca3af; margin-top: 4px;">' + this.formatTimeAgo(commentTime) + '</div>',
+          '</div>'
+        ].join('');
+      });
+      commentsHtml += '</div>';
+    }
+
+    content.innerHTML = [
+      '<div class="feedback-form">',
+        '<div class="feedback-form-header">',
+          '<button class="feedback-back-button" id="feedback-detail-back-btn">← Back to Ideas</button>',
+        '</div>',
+        '<div style="display: flex; align-items: start; gap: 12px; margin-bottom: 16px;">',
+          '<div style="display: flex; flex-direction: column; align-items: center;">',
+            '<button class="feedback-upvote-btn" id="feedback-detail-upvote" data-id="' + feedback.id + '">▲</button>',
+            '<div class="feedback-vote-count">' + (feedback.upvotes ? feedback.upvotes.length : 0) + '</div>',
+          '</div>',
+          '<div style="flex: 1;">',
+            '<h2 style="margin: 0 0 8px 0; font-size: 18px; font-weight: 600;">' + this.escapeHtml(feedback.title) + '</h2>',
+            '<div style="font-size: 12px; color: #6b7280; margin-bottom: 8px;">' + timeAgo + ' • ' + (feedback.comments ? feedback.comments.length : 0) + ' comments</div>',
+            '<p style="margin: 0 0 8px 0; color: #374151; line-height: 1.5;">' + this.escapeHtml(feedback.summary) + '</p>',
+            labelsHtml,
+          '</div>',
+        '</div>',
+        commentsHtml,
+      '</div>'
+    ].join('');
+    
+    this.addDetailEventListeners();
+  };
+
+  FeedbackSDK.prototype.addDetailEventListeners = function() {
+    var self = this;
+    
+    var backBtn = document.getElementById('feedback-detail-back-btn');
+    if (backBtn) {
+      backBtn.addEventListener('click', function() {
+        self.showFeedbackList();
+      });
+    }
+
+    var upvoteBtn = document.getElementById('feedback-detail-upvote');
+    if (upvoteBtn) {
+      upvoteBtn.addEventListener('click', function() {
+        self.handleUpvote(this.getAttribute('data-id'));
+      });
+    }
+  };
+
+  FeedbackSDK.prototype.formatTimeAgo = function(date) {
+    var now = new Date();
+    var diffInSeconds = Math.floor((now - date) / 1000);
+    
+    if (diffInSeconds < 60) return 'just now';
+    if (diffInSeconds < 3600) return Math.floor(diffInSeconds / 60) + ' minutes ago';
+    if (diffInSeconds < 86400) return Math.floor(diffInSeconds / 3600) + ' hours ago';
+    if (diffInSeconds < 2592000) return Math.floor(diffInSeconds / 86400) + ' days ago';
+    if (diffInSeconds < 31536000) return Math.floor(diffInSeconds / 2592000) + ' months ago';
+    return Math.floor(diffInSeconds / 31536000) + ' years ago';
+  };
+
+  FeedbackSDK.prototype.escapeHtml = function(text) {
+    var div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
   };
 
   // Public methods
