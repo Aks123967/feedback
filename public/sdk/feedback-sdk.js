@@ -393,6 +393,53 @@
     document.head.appendChild(style);
   };
 
+  // API helper function with CORS handling
+  FeedbackSDK.prototype.makeApiRequest = function(url, options) {
+    var self = this;
+    return new Promise(function(resolve, reject) {
+      var xhr = new XMLHttpRequest();
+      
+      // Set up the request
+      xhr.open(options.method || 'GET', url, true);
+      
+      // Set CORS headers
+      xhr.setRequestHeader('Content-Type', 'application/json');
+      xhr.setRequestHeader('Access-Control-Allow-Origin', '*');
+      xhr.setRequestHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+      xhr.setRequestHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+      
+      // Add API key if provided
+      if (self.config.apiKey) {
+        xhr.setRequestHeader('Authorization', 'Bearer ' + self.config.apiKey);
+      }
+      
+      xhr.onreadystatechange = function() {
+        if (xhr.readyState === 4) {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+              var response = JSON.parse(xhr.responseText);
+              resolve(response);
+            } catch (e) {
+              resolve(xhr.responseText);
+            }
+          } else {
+            reject(new Error('Request failed with status: ' + xhr.status));
+          }
+        }
+      };
+      
+      xhr.onerror = function() {
+        reject(new Error('Network error'));
+      };
+      
+      // Send the request
+      if (options.body) {
+        xhr.send(JSON.stringify(options.body));
+      } else {
+        xhr.send();
+      }
+    });
+  };
   FeedbackSDK.prototype.addEventListeners = function() {
     var self = this;
     var triggerBtn = document.getElementById('feedback-trigger-btn');
@@ -476,6 +523,44 @@
   // Load feedback data from localStorage (synced with main app)
   FeedbackSDK.prototype.loadFeedbackData = function() {
     try {
+      var self = this;
+      
+      // Try to load from API first, fallback to localStorage
+      if (this.config.apiEndpoint) {
+        this.makeApiRequest(this.config.apiEndpoint + '/feedback', {
+          method: 'GET'
+        }).then(function(data) {
+          self.feedbackData = data.map(function(req) {
+            return {
+              id: req.id,
+              title: req.title,
+              summary: req.summary,
+              upvotes: req.upvotes || [],
+              comments: (req.comments || []).filter(function(comment) {
+                return comment.isPublic;
+              }),
+              labels: req.labels || [],
+              createdAt: new Date(req.createdAt),
+              author: req.author
+            };
+          });
+          self.showFeedbackList();
+        }).catch(function(error) {
+          console.error('Failed to load from API, using localStorage:', error);
+          self.loadFromLocalStorage();
+        });
+      } else {
+        this.loadFromLocalStorage();
+      }
+    } catch (error) {
+      console.error('Error loading feedback data:', error);
+      this.loadFromLocalStorage();
+    }
+  };
+
+  // Fallback to localStorage
+  FeedbackSDK.prototype.loadFromLocalStorage = function() {
+    try {
       var stored = localStorage.getItem('feedback-requests');
       if (stored) {
         var parsed = JSON.parse(stored);
@@ -499,14 +584,41 @@
       } else {
         this.feedbackData = [];
       }
+      this.showFeedbackList();
     } catch (error) {
-      console.error('Error loading feedback data:', error);
+      console.error('Error loading from localStorage:', error);
       this.feedbackData = [];
+      this.showFeedbackList();
+    }
+  };
+  // Save feedback data to localStorage (synced with main app)
+  FeedbackSDK.prototype.saveFeedbackData = function(newFeedback) {
+    try {
+      var self = this;
+      
+      // Try to save via API first
+      if (this.config.apiEndpoint) {
+        this.makeApiRequest(this.config.apiEndpoint + '/feedback', {
+          method: 'POST',
+          body: newFeedback
+        }).then(function(response) {
+          // Reload data after successful save
+          self.loadFeedbackData();
+        }).catch(function(error) {
+          console.error('Failed to save via API, using localStorage:', error);
+          self.saveToLocalStorage(newFeedback);
+        });
+      } else {
+        this.saveToLocalStorage(newFeedback);
+      }
+    } catch (error) {
+      console.error('Error saving feedback data:', error);
+      this.saveToLocalStorage(newFeedback);
     }
   };
 
-  // Save feedback data to localStorage (synced with main app)
-  FeedbackSDK.prototype.saveFeedbackData = function(newFeedback) {
+  // Fallback save to localStorage
+  FeedbackSDK.prototype.saveToLocalStorage = function(newFeedback) {
     try {
       var stored = localStorage.getItem('feedback-requests');
       var allFeedback = stored ? JSON.parse(stored) : [];
@@ -520,12 +632,42 @@
       // Reload our filtered data
       this.loadFeedbackData();
     } catch (error) {
-      console.error('Error saving feedback data:', error);
+      console.error('Error saving to localStorage:', error);
+    }
+  };
+  // Update upvote in localStorage
+  FeedbackSDK.prototype.updateUpvote = function(feedbackId) {
+    try {
+      var self = this;
+      var upvoteData = {
+        feedbackId: feedbackId,
+        userId: 'widget-user-' + Date.now(),
+        userName: 'Anonymous User'
+      };
+      
+      // Try to save via API first
+      if (this.config.apiEndpoint) {
+        this.makeApiRequest(this.config.apiEndpoint + '/upvote', {
+          method: 'POST',
+          body: upvoteData
+        }).then(function(response) {
+          // Reload data after successful upvote
+          self.loadFeedbackData();
+        }).catch(function(error) {
+          console.error('Failed to upvote via API, using localStorage:', error);
+          self.upvoteLocalStorage(feedbackId);
+        });
+      } else {
+        this.upvoteLocalStorage(feedbackId);
+      }
+    } catch (error) {
+      console.error('Error updating upvote:', error);
+      this.upvoteLocalStorage(feedbackId);
     }
   };
 
-  // Update upvote in localStorage
-  FeedbackSDK.prototype.updateUpvote = function(feedbackId) {
+  // Fallback upvote to localStorage
+  FeedbackSDK.prototype.upvoteLocalStorage = function(feedbackId) {
     try {
       var stored = localStorage.getItem('feedback-requests');
       if (!stored) return;
@@ -554,16 +696,14 @@
         this.loadFeedbackData();
       }
     } catch (error) {
-      console.error('Error updating upvote:', error);
+      console.error('Error updating upvote in localStorage:', error);
     }
   };
-
   FeedbackSDK.prototype.loadFeedbackContent = function() {
     var content = document.getElementById('feedback-content');
     if (!content) return;
     
     this.loadFeedbackData();
-    this.showFeedbackList();
   };
 
   FeedbackSDK.prototype.showFeedbackList = function() {

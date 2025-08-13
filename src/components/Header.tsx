@@ -148,14 +148,15 @@ export const Header: React.FC<HeaderProps> = ({
                 <label className="block text-sm font-medium text-gray-700 mb-2">Embed Code</label>
                 <div className="relative">
                   <pre className="bg-gray-900 text-green-400 p-4 rounded-lg text-sm overflow-x-auto">
-{`<!-- Feedback Widget -->
-<script src="${window.location.origin}/sdk/feedback-sdk.js"></script>
+{`<!-- Feedback Widget (CORS-enabled) -->
+<script src="https://verdant-panda-798257.netlify.app/sdk/feedback-sdk.js"></script>
 <script>
   new FeedbackSDK({
     apiKey: '${apiKey}',
     position: 'bottom-right',
     primaryColor: '#3B82F6',
-    title: 'Feedback'
+    title: 'Feedback',
+    apiEndpoint: 'https://verdant-panda-798257.netlify.app/api'
   });
 </script>`}
                   </pre>
@@ -175,6 +176,7 @@ export const Header: React.FC<HeaderProps> = ({
                   <li>• <strong>Theme:</strong> 'light', 'dark'</li>
                   <li>• <strong>Primary Color:</strong> Any hex color code</li>
                   <li>• <strong>Title:</strong> Custom widget title</li>
+                  <li>• <strong>API Endpoint:</strong> Custom API endpoint for data</li>
                 </ul>
               </div>
             </div>
