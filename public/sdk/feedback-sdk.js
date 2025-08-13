@@ -435,8 +435,7 @@
         overlay.classList.add('visible');
       }, 10);
       
-      // Load content immediately
-      this.showFeedbackList();
+      this.loadFeedbackContent();
     }
   };
 
@@ -502,19 +501,7 @@
       }
     } catch (error) {
       console.error('Error loading feedback data:', error);
-      // Fallback to demo data if there's an error
-      this.feedbackData = [
-        {
-          id: 'fallback-1',
-          title: 'Sample feedback item',
-          summary: 'This is a sample feedback item to demonstrate the widget functionality.',
-          upvotes: [{ id: '1', userId: '1', userName: 'Demo User', createdAt: new Date() }],
-          comments: [],
-          labels: [{ id: '4', name: 'FEATURE', color: 'purple' }],
-          createdAt: new Date(),
-          author: 'Demo User'
-        }
-      ];
+      this.feedbackData = [];
     }
   };
 
@@ -571,12 +558,17 @@
     }
   };
 
-  FeedbackSDK.prototype.showFeedbackList = function() {
+  FeedbackSDK.prototype.loadFeedbackContent = function() {
     var content = document.getElementById('feedback-content');
     if (!content) return;
     
-    // Load data first
     this.loadFeedbackData();
+    this.showFeedbackList();
+  };
+
+  FeedbackSDK.prototype.showFeedbackList = function() {
+    var content = document.getElementById('feedback-content');
+    if (!content) return;
     
     this.currentView = 'list';
     content.innerHTML = this.getFeedbackListHTML();
@@ -596,10 +588,7 @@
     ];
 
     if (this.feedbackData.length === 0) {
-      html.push('<div class="feedback-empty">');
-      html.push('<p style="margin-bottom: 16px;">No feedback found yet.</p>');
-      html.push('<p style="font-size: 14px; color: #6b7280;">Be the first to share an idea!</p>');
-      html.push('</div>');
+      html.push('<div class="feedback-empty">No feedback found. Be the first to share an idea!</div>');
     } else {
       this.feedbackData.forEach(function(item) {
         var timeAgo = self.formatTimeAgo(item.createdAt);
@@ -660,76 +649,7 @@
           labelsOptions,
         '</select>',
         '<div class="feedback-form-actions">',
-        // If no data exists, create some sample data for demonstration
-        this.feedbackData = [
-          {
-            id: 'demo-1',
-            title: 'Add dark mode support',
-            summary: 'Would love to have a dark theme option for better user experience during night time usage.',
-            upvotes: Array.from({length: 15}, function(_, i) { 
-              return {
-                id: 'upvote-' + i,
-                userId: 'user-' + i,
-                userName: 'User ' + (i + 1),
-                createdAt: new Date(Date.now() - i * 3600000)
-              };
-            }),
-            comments: [
-              {
-                id: 'comment-1',
-                content: 'This would be really helpful for late night work sessions!',
-                author: 'John Doe',
-                isPublic: true,
-                createdAt: new Date(Date.now() - 86400000)
-              }
-            ],
-            labels: [{ id: '4', name: 'FEATURE', color: 'purple' }],
-            createdAt: new Date(Date.now() - 172800000),
-            author: 'Sarah Wilson'
-          },
-          {
-            id: 'demo-2',
-            title: 'Mobile app version',
-            summary: 'A native mobile app would make it much easier to access on the go.',
-            upvotes: Array.from({length: 8}, function(_, i) { 
-              return {
-                id: 'upvote-mobile-' + i,
-                userId: 'user-mobile-' + i,
-                userName: 'Mobile User ' + (i + 1),
-                createdAt: new Date(Date.now() - i * 7200000)
-              };
-            }),
-            comments: [],
-            labels: [{ id: '4', name: 'FEATURE', color: 'purple' }],
-            createdAt: new Date(Date.now() - 259200000),
-            author: 'Mike Johnson'
-          },
-          {
-            id: 'demo-3',
-            title: 'Improve loading speed',
-            summary: 'The application takes a bit long to load, especially on slower connections.',
-            upvotes: Array.from({length: 12}, function(_, i) { 
-              return {
-                id: 'upvote-speed-' + i,
-                userId: 'user-speed-' + i,
-                userName: 'Speed User ' + (i + 1),
-                createdAt: new Date(Date.now() - i * 5400000)
-              };
-            }),
-            comments: [
-              {
-                id: 'comment-speed-1',
-                content: 'Yes, this is definitely needed. Takes about 10 seconds on my connection.',
-                author: 'Alex Smith',
-                isPublic: true,
-                createdAt: new Date(Date.now() - 43200000)
-              }
-            ],
-            labels: [{ id: '3', name: 'IMPROVEMENT', color: 'green' }],
-            createdAt: new Date(Date.now() - 345600000),
-            author: 'Emma Davis'
-          }
-        ];
+          '<button class="feedback-cancel-button" id="feedback-cancel-btn">Cancel</button>',
           '<button class="feedback-submit-button" id="feedback-submit-btn">Create</button>',
         '</div>',
       '</div>'
