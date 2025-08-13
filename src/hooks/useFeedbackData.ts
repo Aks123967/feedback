@@ -71,6 +71,36 @@ export const useFeedbackData = () => {
     saveToStorage(featureRequests);
   }, [featureRequests]);
 
+  // Listen for storage changes from widget
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === STORAGE_KEY && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          const converted = parsed.map((req: any) => ({
+            ...req,
+            createdAt: new Date(req.createdAt),
+            updatedAt: new Date(req.updatedAt),
+            upvotes: req.upvotes.map((upvote: any) => ({
+              ...upvote,
+              createdAt: new Date(upvote.createdAt),
+            })),
+            comments: req.comments.map((comment: any) => ({
+              ...comment,
+              createdAt: new Date(comment.createdAt),
+            })),
+          }));
+          setFeatureRequests(converted);
+        } catch (error) {
+          console.error('Error parsing storage update:', error);
+        }
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
   const addFeatureRequest = useCallback((request: Omit<FeatureRequest, 'id' | 'createdAt' | 'updatedAt' | 'upvotes' | 'comments'>) => {
     const newRequest: FeatureRequest = {
       ...request,

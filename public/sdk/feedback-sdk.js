@@ -525,33 +525,8 @@
     try {
       var self = this;
       
-      // Try to load from API first, fallback to localStorage
-      if (this.config.apiEndpoint) {
-        this.makeApiRequest(this.config.apiEndpoint + '/feedback', {
-          method: 'GET'
-        }).then(function(data) {
-          self.feedbackData = data.map(function(req) {
-            return {
-              id: req.id,
-              title: req.title,
-              summary: req.summary,
-              upvotes: req.upvotes || [],
-              comments: (req.comments || []).filter(function(comment) {
-                return comment.isPublic;
-              }),
-              labels: req.labels || [],
-              createdAt: new Date(req.createdAt),
-              author: req.author
-            };
-          });
-          self.showFeedbackList();
-        }).catch(function(error) {
-          console.error('Failed to load from API, using localStorage:', error);
-          self.loadFromLocalStorage();
-        });
-      } else {
-        this.loadFromLocalStorage();
-      }
+      // Always use localStorage for now to ensure sync with main app
+      this.loadFromLocalStorage();
     } catch (error) {
       console.error('Error loading feedback data:', error);
       this.loadFromLocalStorage();
@@ -564,7 +539,7 @@
       var stored = localStorage.getItem('feedback-requests');
       if (stored) {
         var parsed = JSON.parse(stored);
-        // Filter only public requests
+        // Filter only public requests and convert dates
         this.feedbackData = parsed.filter(function(req) {
           return req.status === 'public';
         }).map(function(req) {
@@ -572,12 +547,13 @@
             id: req.id,
             title: req.title,
             summary: req.summary,
+            status: req.status,
             upvotes: req.upvotes || [],
             comments: (req.comments || []).filter(function(comment) {
               return comment.isPublic;
             }),
             labels: req.labels || [],
-            createdAt: new Date(req.createdAt),
+            createdAt: typeof req.createdAt === 'string' ? new Date(req.createdAt) : req.createdAt,
             author: req.author
           };
         });
@@ -596,21 +572,8 @@
     try {
       var self = this;
       
-      // Try to save via API first
-      if (this.config.apiEndpoint) {
-        this.makeApiRequest(this.config.apiEndpoint + '/feedback', {
-          method: 'POST',
-          body: newFeedback
-        }).then(function(response) {
-          // Reload data after successful save
-          self.loadFeedbackData();
-        }).catch(function(error) {
-          console.error('Failed to save via API, using localStorage:', error);
-          self.saveToLocalStorage(newFeedback);
-        });
-      } else {
-        this.saveToLocalStorage(newFeedback);
-      }
+      // Always use localStorage to ensure sync with main app
+      this.saveToLocalStorage(newFeedback);
     } catch (error) {
       console.error('Error saving feedback data:', error);
       this.saveToLocalStorage(newFeedback);
@@ -623,14 +586,36 @@
       var stored = localStorage.getItem('feedback-requests');
       var allFeedback = stored ? JSON.parse(stored) : [];
       
+      // Create complete feedback object with all required fields
+      var completeFeedback = {
+        id: newFeedback.id || Date.now().toString(),
+        title: newFeedback.title,
+        summary: newFeedback.summary || newFeedback.description,
+        status: newFeedback.status || 'public',
+        author: newFeedback.author || 'Anonymous User',
+        labels: newFeedback.labels || [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        upvotes: newFeedback.upvotes || [],
+        comments: newFeedback.comments || []
+      };
+      
       // Add new feedback
-      allFeedback.unshift(newFeedback);
+      allFeedback.unshift(completeFeedback);
       
       // Save back to localStorage
       localStorage.setItem('feedback-requests', JSON.stringify(allFeedback));
       
       // Reload our filtered data
       this.loadFeedbackData();
+      
+      // Trigger storage event for main app to update
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'feedback-requests',
+        newValue: JSON.stringify(allFeedback),
+        storageArea: localStorage
+      }));
+      
     } catch (error) {
       console.error('Error saving to localStorage:', error);
     }
@@ -639,27 +624,9 @@
   FeedbackSDK.prototype.updateUpvote = function(feedbackId) {
     try {
       var self = this;
-      var upvoteData = {
-        feedbackId: feedbackId,
-        userId: 'widget-user-' + Date.now(),
-        userName: 'Anonymous User'
-      };
       
-      // Try to save via API first
-      if (this.config.apiEndpoint) {
-        this.makeApiRequest(this.config.apiEndpoint + '/upvote', {
-          method: 'POST',
-          body: upvoteData
-        }).then(function(response) {
-          // Reload data after successful upvote
-          self.loadFeedbackData();
-        }).catch(function(error) {
-          console.error('Failed to upvote via API, using localStorage:', error);
-          self.upvoteLocalStorage(feedbackId);
-        });
-      } else {
-        this.upvoteLocalStorage(feedbackId);
-      }
+      // Always use localStorage to ensure sync with main app
+      this.upvoteLocalStorage(feedbackId);
     } catch (error) {
       console.error('Error updating upvote:', error);
       this.upvoteLocalStorage(feedbackId);
@@ -693,6 +660,14 @@
         allFeedback[feedbackIndex].updatedAt = new Date().toISOString();
         
         localStorage.setItem('feedback-requests', JSON.stringify(allFeedback));
+        
+        // Trigger storage event for main app to update
+        window.dispatchEvent(new StorageEvent('storage', {
+          key: 'feedback-requests',
+          newValue: JSON.stringify(allFeedback),
+          storageArea: localStorage
+        }));
+        
         this.loadFeedbackData();
       }
     } catch (error) {
@@ -917,6 +892,7 @@
       id: Date.now().toString(),
       title: title,
       summary: description,
+      description: description,
       status: 'public',
       author: 'Anonymous User',
       labels: selectedLabel ? [selectedLabel] : [],
