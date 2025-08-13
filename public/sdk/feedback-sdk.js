@@ -524,10 +524,6 @@
       var stored = localStorage.getItem('feedback-requests');
       var allFeedback = stored ? JSON.parse(stored) : [];
       
-      // Convert dates to proper format for main app
-      newFeedback.createdAt = new Date().toISOString();
-      newFeedback.updatedAt = new Date().toISOString();
-      
       // Add new feedback
       allFeedback.unshift(newFeedback);
       
@@ -536,15 +532,6 @@
       
       // Reload our filtered data
       this.loadFeedbackData();
-      
-      // Trigger storage event for main app to update
-      if (window.dispatchEvent) {
-        window.dispatchEvent(new StorageEvent('storage', {
-          key: 'feedback-requests',
-          newValue: JSON.stringify(allFeedback),
-          url: window.location.href
-        }));
-      }
     } catch (error) {
       console.error('Error saving feedback data:', error);
     }
@@ -577,16 +564,6 @@
         allFeedback[feedbackIndex].updatedAt = new Date().toISOString();
         
         localStorage.setItem('feedback-requests', JSON.stringify(allFeedback));
-        
-        // Trigger storage event for main app to update
-        if (window.dispatchEvent) {
-          window.dispatchEvent(new StorageEvent('storage', {
-            key: 'feedback-requests',
-            newValue: JSON.stringify(allFeedback),
-            url: window.location.href
-          }));
-        }
-        
         this.loadFeedbackData();
       }
     } catch (error) {
