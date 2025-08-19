@@ -606,15 +606,15 @@
       // Save back to localStorage
       localStorage.setItem('feedback-requests', JSON.stringify(allFeedback));
       
-      // Reload our filtered data
-      this.loadFeedbackData();
-      
       // Trigger storage event for main app to update
       window.dispatchEvent(new StorageEvent('storage', {
         key: 'feedback-requests',
         newValue: JSON.stringify(allFeedback),
         storageArea: localStorage
       }));
+      
+      // Reload our filtered data
+      this.loadFeedbackData();
       
     } catch (error) {
       console.error('Error saving to localStorage:', error);
@@ -691,8 +691,6 @@
   };
 
   FeedbackSDK.prototype.getFeedbackListHTML = function() {
-    var self = this;
-    
     var html = [
       '<div class="feedback-widget-content">',
         '<div class="feedback-search-bar">',
@@ -705,6 +703,7 @@
     if (this.feedbackData.length === 0) {
       html.push('<div class="feedback-empty">No feedback found. Be the first to share an idea!</div>');
     } else {
+      var self = this;
       this.feedbackData.forEach(function(item) {
         var timeAgo = self.formatTimeAgo(item.createdAt);
         var labelsHtml = '';
@@ -724,8 +723,8 @@
               '<div class="feedback-vote-count">' + (item.upvotes ? item.upvotes.length : 0) + '</div>',
             '</div>',
             '<div class="feedback-content-text">',
-              '<h3 class="feedback-title">' + this.escapeHtml(item.title) + '</h3>',
-              '<p class="feedback-description">' + this.escapeHtml(item.summary) + '</p>',
+              '<h3 class="feedback-title">' + self.escapeHtml(item.title) + '</h3>',
+              '<p class="feedback-description">' + self.escapeHtml(item.summary) + '</p>',
               '<div class="feedback-meta">',
                 timeAgo + ' • ' + (item.comments ? item.comments.length : 0) + ' comments',
               '</div>',
@@ -733,7 +732,7 @@
             '</div>',
           '</div>'
         ].join(''));
-      });
+      }.bind(this));
     }
 
     html.push('</div></div>');
@@ -920,6 +919,7 @@
     var content = document.getElementById('feedback-content');
     if (!content) return;
     
+    var self = this;
     var timeAgo = this.formatTimeAgo(feedback.createdAt);
     var labelsHtml = '';
     
@@ -958,9 +958,9 @@
             '<div class="feedback-vote-count">' + (feedback.upvotes ? feedback.upvotes.length : 0) + '</div>',
           '</div>',
           '<div style="flex: 1;">',
-            '<h2 style="margin: 0 0 8px 0; font-size: 18px; font-weight: 600;">' + this.escapeHtml(feedback.title) + '</h2>',
+            '<h2 style="margin: 0 0 8px 0; font-size: 18px; font-weight: 600;">' + self.escapeHtml(feedback.title) + '</h2>',
             '<div style="font-size: 12px; color: #6b7280; margin-bottom: 8px;">' + timeAgo + ' • ' + (feedback.comments ? feedback.comments.length : 0) + ' comments</div>',
-            '<p style="margin: 0 0 8px 0; color: #374151; line-height: 1.5;">' + this.escapeHtml(feedback.summary) + '</p>',
+            '<p style="margin: 0 0 8px 0; color: #374151; line-height: 1.5;">' + self.escapeHtml(feedback.summary) + '</p>',
             labelsHtml,
           '</div>',
         '</div>',
@@ -990,6 +990,11 @@
   };
 
   FeedbackSDK.prototype.formatTimeAgo = function(date) {
+    // Handle both string and Date objects
+    if (typeof date === 'string') {
+      date = new Date(date);
+    }
+    
     var now = new Date();
     var diffInSeconds = Math.floor((now - date) / 1000);
     
