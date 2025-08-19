@@ -523,9 +523,6 @@
   // Load feedback data from localStorage (synced with main app)
   FeedbackSDK.prototype.loadFeedbackData = function() {
     try {
-      var self = this;
-      
-      // Always use localStorage for now to ensure sync with main app
       this.loadFromLocalStorage();
     } catch (error) {
       console.error('Error loading feedback data:', error);
@@ -539,27 +536,33 @@
       var stored = localStorage.getItem('feedback-requests');
       if (stored) {
         var parsed = JSON.parse(stored);
-        // Filter only public requests and convert dates
-        this.feedbackData = parsed.filter(function(req) {
-          return req.status === 'public';
-        }).map(function(req) {
+        // Convert dates and filter public requests
+        this.feedbackData = parsed.map(function(req) {
           return {
             id: req.id,
             title: req.title,
             summary: req.summary,
             status: req.status,
+            author: req.author,
             upvotes: req.upvotes || [],
             comments: (req.comments || []).filter(function(comment) {
               return comment.isPublic;
             }),
             labels: req.labels || [],
-            createdAt: typeof req.createdAt === 'string' ? new Date(req.createdAt) : req.createdAt,
-            author: req.author
+            createdAt: typeof req.createdAt === 'string' ? new Date(req.createdAt) : req.createdAt
           };
+        }).filter(function(req) {
+          return req.status === 'public';
         });
       } else {
         this.feedbackData = [];
       }
+      
+      // Sort by upvotes (most upvoted first)
+      this.feedbackData.sort(function(a, b) {
+        return (b.upvotes ? b.upvotes.length : 0) - (a.upvotes ? a.upvotes.length : 0);
+      });
+      
       this.showFeedbackList();
     } catch (error) {
       console.error('Error loading from localStorage:', error);
@@ -570,9 +573,6 @@
   // Save feedback data to localStorage (synced with main app)
   FeedbackSDK.prototype.saveFeedbackData = function(newFeedback) {
     try {
-      var self = this;
-      
-      // Always use localStorage to ensure sync with main app
       this.saveToLocalStorage(newFeedback);
     } catch (error) {
       console.error('Error saving feedback data:', error);
@@ -606,8 +606,27 @@
       // Save back to localStorage
       localStorage.setItem('feedback-requests', JSON.stringify(allFeedback));
       
-      // Trigger storage event for main app to update
-      window.dispatchEvent(new StorageEvent('storage', {
+      // Trigger storage event to notify main app
+      var storageEvent = new Event('storage');
+      storageEvent.key = 'feedback-requests';
+      storageEvent.newValue = JSON.stringify(allFeedback);
+      storageEvent.storageArea = localStorage;
+      window.dispatchEvent(storageEvent);
+      
+      // Also trigger a custom event for immediate updates
+      window.dispatchEvent(new CustomEvent('feedbackUpdated', {
+        detail: { feedback: allFeedback }
+      }));
+      
+      // Force reload of data
+      setTimeout(function() {
+        this.loadFeedbackData();
+      }.bind(this), 100);
+      
+    } catch (error) {
+      console.error('Error saving to localStorage:', error);
+    }
+  };
         key: 'feedback-requests',
         newValue: JSON.stringify(allFeedback),
         storageArea: localStorage
@@ -623,9 +642,6 @@
   // Update upvote in localStorage
   FeedbackSDK.prototype.updateUpvote = function(feedbackId) {
     try {
-      var self = this;
-      
-      // Always use localStorage to ensure sync with main app
       this.upvoteLocalStorage(feedbackId);
     } catch (error) {
       console.error('Error updating upvote:', error);
@@ -661,8 +677,27 @@
         
         localStorage.setItem('feedback-requests', JSON.stringify(allFeedback));
         
-        // Trigger storage event for main app to update
-        window.dispatchEvent(new StorageEvent('storage', {
+        // Trigger storage event to notify main app
+        var storageEvent = new Event('storage');
+        storageEvent.key = 'feedback-requests';
+        storageEvent.newValue = JSON.stringify(allFeedback);
+        storageEvent.storageArea = localStorage;
+        window.dispatchEvent(storageEvent);
+        
+        // Also trigger custom event
+        window.dispatchEvent(new CustomEvent('feedbackUpdated', {
+          detail: { feedback: allFeedback }
+        }));
+        
+        // Reload data to update UI
+        setTimeout(function() {
+          this.loadFeedbackData();
+        }.bind(this), 100);
+      }
+    } catch (error) {
+      console.error('Error updating upvote in localStorage:', error);
+    }
+  };
           key: 'feedback-requests',
           newValue: JSON.stringify(allFeedback),
           storageArea: localStorage
