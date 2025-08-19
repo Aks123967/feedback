@@ -97,34 +97,8 @@ export const useFeedbackData = () => {
       }
     };
 
-    const handleFeedbackUpdate = (e: CustomEvent) => {
-      try {
-        const feedback = e.detail.feedback;
-        const converted = feedback.map((req: any) => ({
-          ...req,
-          createdAt: new Date(req.createdAt),
-          updatedAt: new Date(req.updatedAt),
-          upvotes: req.upvotes.map((upvote: any) => ({
-            ...upvote,
-            createdAt: new Date(upvote.createdAt),
-          })),
-          comments: req.comments.map((comment: any) => ({
-            ...comment,
-            createdAt: new Date(comment.createdAt),
-          })),
-        }));
-        setFeatureRequests(converted);
-      } catch (error) {
-        console.error('Error handling feedback update:', error);
-      }
-    };
     window.addEventListener('storage', handleStorageChange);
-    window.addEventListener('feedbackUpdated', handleFeedbackUpdate as EventListener);
-    
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('feedbackUpdated', handleFeedbackUpdate as EventListener);
-    };
+    return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
   const addFeatureRequest = useCallback((request: Omit<FeatureRequest, 'id' | 'createdAt' | 'updatedAt' | 'upvotes' | 'comments'>) => {
