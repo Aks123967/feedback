@@ -5,6 +5,29 @@ import { ChatBubbleLeftIcon, XMarkIcon } from '@heroicons/react/24/outline';
 export const FeedbackWidget: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
 
+  // Listen for data updates and refresh widget content
+  React.useEffect(() => {
+    const handleDataUpdate = () => {
+      // Force re-render of widget content when data updates
+      if (isOpen) {
+        // Trigger a re-render by toggling a state or using a key
+        setIsOpen(false);
+        setTimeout(() => setIsOpen(true), 10);
+      }
+    };
+
+    window.addEventListener('feedbackDataUpdated', handleDataUpdate);
+    window.addEventListener('storage', (e) => {
+      if (e.key === 'feedback-requests') {
+        handleDataUpdate();
+      }
+    });
+
+    return () => {
+      window.removeEventListener('feedbackDataUpdated', handleDataUpdate);
+      window.removeEventListener('storage', handleDataUpdate);
+    };
+  }, [isOpen]);
   return (
     <>
       {/* Widget Trigger Button */}

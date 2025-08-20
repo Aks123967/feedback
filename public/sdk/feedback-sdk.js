@@ -570,9 +570,6 @@
   // Save feedback data to localStorage (synced with main app)
   FeedbackSDK.prototype.saveFeedbackData = function(newFeedback) {
     try {
-      var self = this;
-      
-      // Always use localStorage to ensure sync with main app
       this.saveToLocalStorage(newFeedback);
     } catch (error) {
       console.error('Error saving feedback data:', error);
@@ -606,12 +603,20 @@
       // Save back to localStorage
       localStorage.setItem('feedback-requests', JSON.stringify(allFeedback));
       
-      // Trigger storage event for main app to update
-      window.dispatchEvent(new StorageEvent('storage', {
+      // Trigger storage event for cross-window communication
+      var storageEvent = new StorageEvent('storage', {
         key: 'feedback-requests',
         newValue: JSON.stringify(allFeedback),
-        storageArea: localStorage
-      }));
+        oldValue: stored,
+        storageArea: localStorage,
+        url: window.location.href
+      });
+      window.dispatchEvent(storageEvent);
+      
+      // Also trigger on parent window if in iframe
+      if (window.parent && window.parent !== window) {
+        window.parent.dispatchEvent(storageEvent);
+      }
       
       // Reload our filtered data
       this.loadFeedbackData();
@@ -661,12 +666,20 @@
         
         localStorage.setItem('feedback-requests', JSON.stringify(allFeedback));
         
-        // Trigger storage event for main app to update
-        window.dispatchEvent(new StorageEvent('storage', {
+        // Trigger storage event for cross-window communication
+        var storageEvent = new StorageEvent('storage', {
           key: 'feedback-requests',
           newValue: JSON.stringify(allFeedback),
-          storageArea: localStorage
-        }));
+          oldValue: stored,
+          storageArea: localStorage,
+          url: window.location.href
+        });
+        window.dispatchEvent(storageEvent);
+        
+        // Also trigger on parent window if in iframe
+        if (window.parent && window.parent !== window) {
+          window.parent.dispatchEvent(storageEvent);
+        }
         
         this.loadFeedbackData();
       }
@@ -677,6 +690,19 @@
   FeedbackSDK.prototype.loadFeedbackContent = function() {
     var content = document.getElementById('feedback-content');
     if (!content) return;
+    
+    // Listen for storage changes from main app
+    var self = this;
+    window.addEventListener('storage', function(e) {
+      if (e.key === 'feedback-requests') {
+        self.loadFeedbackData();
+      }
+    });
+    
+    // Also listen for custom events from main app
+    window.addEventListener('feedbackDataUpdated', function() {
+      self.loadFeedbackData();
+    });
     
     this.loadFeedbackData();
   };

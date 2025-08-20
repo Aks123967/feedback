@@ -97,8 +97,18 @@ export const useFeedbackData = () => {
       }
     };
 
+    const handleCustomFeedbackUpdate = () => {
+      // Reload data when custom event is triggered
+      const reloaded = loadFromStorage();
+      setFeatureRequests(reloaded);
+    };
     window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
+    window.addEventListener('feedbackDataUpdated', handleCustomFeedbackUpdate);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('feedbackDataUpdated', handleCustomFeedbackUpdate);
+    };
   }, []);
 
   const addFeatureRequest = useCallback((request: Omit<FeatureRequest, 'id' | 'createdAt' | 'updatedAt' | 'upvotes' | 'comments'>) => {
@@ -111,6 +121,10 @@ export const useFeedbackData = () => {
       comments: [],
     };
     setFeatureRequests(prev => [newRequest, ...prev]);
+    
+    // Trigger custom event for widgets
+    window.dispatchEvent(new CustomEvent('feedbackDataUpdated'));
+    
     toast.success('Feature request created successfully!');
     return newRequest;
   }, []);
@@ -121,11 +135,19 @@ export const useFeedbackData = () => {
         ? { ...req, ...updates, updatedAt: new Date() }
         : req
     ));
+    
+    // Trigger custom event for widgets
+    window.dispatchEvent(new CustomEvent('feedbackDataUpdated'));
+    
     toast.success('Feature request updated successfully!');
   }, []);
 
   const deleteFeatureRequest = useCallback((id: string) => {
     setFeatureRequests(prev => prev.filter(req => req.id !== id));
+    
+    // Trigger custom event for widgets
+    window.dispatchEvent(new CustomEvent('feedbackDataUpdated'));
+    
     toast.success('Feature request deleted successfully!');
   }, []);
 
@@ -141,6 +163,10 @@ export const useFeedbackData = () => {
         ? { ...req, comments: [...req.comments, newComment], updatedAt: new Date() }
         : req
     ));
+    
+    // Trigger custom event for widgets
+    window.dispatchEvent(new CustomEvent('feedbackDataUpdated'));
+    
     // Only show toast in admin view, not in public view
     if (comment.author !== 'Anonymous User') {
       toast.success('Comment added successfully!');
@@ -159,6 +185,10 @@ export const useFeedbackData = () => {
         ? { ...req, upvotes: [...req.upvotes, newUpvote], updatedAt: new Date() }
         : req
     ));
+    
+    // Trigger custom event for widgets
+    window.dispatchEvent(new CustomEvent('feedbackDataUpdated'));
+    
     // Only show toast in admin view, not in public view
     if (upvote.userName !== 'Anonymous User') {
       toast.success('Upvote added successfully!');
@@ -171,6 +201,10 @@ export const useFeedbackData = () => {
         ? { ...req, upvotes: req.upvotes.filter(upvote => upvote.userId !== userId) }
         : req
     ));
+    
+    // Trigger custom event for widgets
+    window.dispatchEvent(new CustomEvent('feedbackDataUpdated'));
+    
     toast.success('Upvote removed successfully!');
   }, []);
 
