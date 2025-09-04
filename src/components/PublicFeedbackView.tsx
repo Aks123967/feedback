@@ -20,7 +20,7 @@ interface PublicFeedbackViewProps {
 }
 
 export const PublicFeedbackView: React.FC<PublicFeedbackViewProps> = ({ isWidget = false, apiKey }) => {
-  const { featureRequests, labels, addFeatureRequest, addUpvote, addComment } = useFeedbackData();
+  const { featureRequests, labels, addFeatureRequest, addUpvote, addComment } = useFeedbackData(apiKey);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRequest, setSelectedRequest] = useState<FeatureRequest | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -42,18 +42,16 @@ export const PublicFeedbackView: React.FC<PublicFeedbackViewProps> = ({ isWidget
   }, [featureRequests, selectedRequest]);
 
   // Filter only public requests
-  // If apiKey is provided, filter by account (in real app, this would be account-specific)
   const publicRequests = useMemo(() => {
     return featureRequests
       .filter(req => req.status === 'public')
-      // In production, you'd filter by account: .filter(req => req.accountId === getAccountFromApiKey(apiKey))
       .filter(req => 
         searchTerm === '' || 
         req.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
         req.summary.toLowerCase().includes(searchTerm.toLowerCase())
       )
       .sort((a, b) => b.upvotes.length - a.upvotes.length);
-  }, [featureRequests, searchTerm]);
+  }, [featureRequests, searchTerm, apiKey]);
 
   const handleUpvote = (requestId: string) => {
     const userId = `user-${Date.now()}`;
@@ -72,6 +70,7 @@ export const PublicFeedbackView: React.FC<PublicFeedbackViewProps> = ({ isWidget
     const selectedLabel = formData.selectedLabelId 
       ? labels.find(label => label.id === formData.selectedLabelId)
       : null;
+    
     addFeatureRequest({
       title: formData.title,
       summary: formData.description,
@@ -308,7 +307,9 @@ export const PublicFeedbackView: React.FC<PublicFeedbackViewProps> = ({ isWidget
 
       {publicRequests.length === 0 && (
         <div className="text-center py-8">
-          <p className="text-gray-500 text-sm">No feature requests found.</p>
+          <p className="text-gray-500 text-sm">
+            {apiKey ? 'No ideas yet. Be the first to share one!' : 'No feature requests found.'}
+          </p>
         </div>
       )}
 

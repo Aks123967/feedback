@@ -525,22 +525,25 @@
     try {
       var self = this;
       
-      // Always use localStorage for now to ensure sync with main app
-      this.loadFromLocalStorage();
+      // Load data specific to this API key
+      this.loadFromApiKeyStorage();
     } catch (error) {
       console.error('Error loading feedback data:', error);
-      this.loadFromLocalStorage();
+      this.loadFromApiKeyStorage();
     }
   };
 
-  // Fallback to localStorage
-  FeedbackSDK.prototype.loadFromLocalStorage = function() {
+  // Load data specific to API key
+  FeedbackSDK.prototype.loadFromApiKeyStorage = function() {
     try {
-      var stored = localStorage.getItem('feedback-requests');
+      var apiDataKey = 'feedback-api-data';
+      var stored = localStorage.getItem(apiDataKey);
+      var allApiData = stored ? JSON.parse(stored) : {};
+      var apiKeyData = allApiData[this.config.apiKey] || [];
+      
       if (stored) {
-        var parsed = JSON.parse(stored);
         // Filter only public requests and convert dates
-        this.feedbackData = parsed.filter(function(req) {
+        this.feedbackData = apiKeyData.filter(function(req) {
           return req.status === 'public';
         }).map(function(req) {
           return {
@@ -570,18 +573,20 @@
   // Save feedback data to localStorage (synced with main app)
   FeedbackSDK.prototype.saveFeedbackData = function(newFeedback) {
     try {
-      this.saveToLocalStorage(newFeedback);
+      this.saveToApiKeyStorage(newFeedback);
     } catch (error) {
       console.error('Error saving feedback data:', error);
-      this.saveToLocalStorage(newFeedback);
+      this.saveToApiKeyStorage(newFeedback);
     }
   };
 
-  // Fallback save to localStorage
-  FeedbackSDK.prototype.saveToLocalStorage = function(newFeedback) {
+  // Save to API key specific storage
+  FeedbackSDK.prototype.saveToApiKeyStorage = function(newFeedback) {
     try {
-      var stored = localStorage.getItem('feedback-requests');
-      var allFeedback = stored ? JSON.parse(stored) : [];
+      var apiDataKey = 'feedback-api-data';
+      var stored = localStorage.getItem(apiDataKey);
+      var allApiData = stored ? JSON.parse(stored) : {};
+      var apiKeyData = allApiData[this.config.apiKey] || [];
       
       // Create complete feedback object with all required fields
       var completeFeedback = {
@@ -598,15 +603,16 @@
       };
       
       // Add new feedback
-      allFeedback.unshift(completeFeedback);
+      apiKeyData.unshift(completeFeedback);
+      allApiData[this.config.apiKey] = apiKeyData;
       
-      // Save back to localStorage
-      localStorage.setItem('feedback-requests', JSON.stringify(allFeedback));
+      // Save back to API key storage
+      localStorage.setItem(apiDataKey, JSON.stringify(allApiData));
       
       // Trigger storage event for cross-window communication
       var storageEvent = new StorageEvent('storage', {
-        key: 'feedback-requests',
-        newValue: JSON.stringify(allFeedback),
+        key: apiDataKey + '-' + this.config.apiKey,
+        newValue: JSON.stringify(apiKeyData),
         oldValue: stored,
         storageArea: localStorage,
         url: window.location.href
@@ -616,6 +622,13 @@
       // Also trigger on parent window if in iframe
       if (window.parent && window.parent !== window) {
         window.parent.dispatchEvent(storageEvent);
+      }
+      
+      // Trigger API key specific event
+      var customEvent = new CustomEvent('feedbackDataUpdated-' + this.config.apiKey);
+      window.dispatchEvent(customEvent);
+      if (window.parent && window.parent !== window) {
+        window.parent.dispatchEvent(customEvent);
       }
       
       // Reload our filtered data
@@ -630,22 +643,23 @@
     try {
       var self = this;
       
-      // Always use localStorage to ensure sync with main app
-      this.upvoteLocalStorage(feedbackId);
+      // Always use API key storage to ensure sync with main app
+      this.upvoteApiKeyStorage(feedbackId);
     } catch (error) {
       console.error('Error updating upvote:', error);
-      this.upvoteLocalStorage(feedbackId);
+      this.upvoteApiKeyStorage(feedbackId);
     }
   };
 
-  // Fallback upvote to localStorage
-  FeedbackSDK.prototype.upvoteLocalStorage = function(feedbackId) {
+  // Upvote in API key storage
+  FeedbackSDK.prototype.upvoteApiKeyStorage = function(feedbackId) {
     try {
-      var stored = localStorage.getItem('feedback-requests');
-      if (!stored) return;
+      var apiDataKey = 'feedback-api-data';
+      var stored = localStorage.getItem(apiDataKey);
+      var allApiData = stored ? JSON.parse(stored) : {};
+      var apiKeyData = allApiData[this.config.apiKey] || [];
       
-      var allFeedback = JSON.parse(stored);
-      var feedbackIndex = allFeedback.findIndex(function(req) {
+      var feedbackIndex = apiKeyData.findIndex(function(req) {
         return req.id === feedbackId;
       });
       
@@ -657,19 +671,20 @@
           createdAt: new Date().toISOString()
         };
         
-        if (!allFeedback[feedbackIndex].upvotes) {
-          allFeedback[feedbackIndex].upvotes = [];
+        if (!apiKeyData[feedbackIndex].upvotes) {
+          apiKeyData[feedbackIndex].upvotes = [];
         }
         
-        allFeedback[feedbackIndex].upvotes.push(newUpvote);
-        allFeedback[feedbackIndex].updatedAt = new Date().toISOString();
+        apiKeyData[feedbackIndex].upvotes.push(newUpvote);
+        apiKeyData[feedbackIndex].updatedAt = new Date().toISOString();
+        allApiData[this.config.apiKey] = apiKeyData;
         
-        localStorage.setItem('feedback-requests', JSON.stringify(allFeedback));
+        localStorage.setItem(apiDataKey, JSON.stringify(allApiData));
         
         // Trigger storage event for cross-window communication
         var storageEvent = new StorageEvent('storage', {
-          key: 'feedback-requests',
-          newValue: JSON.stringify(allFeedback),
+          key: apiDataKey + '-' + this.config.apiKey,
+          newValue: JSON.stringify(apiKeyData),
           oldValue: stored,
           storageArea: localStorage,
           url: window.location.href
@@ -679,6 +694,13 @@
         // Also trigger on parent window if in iframe
         if (window.parent && window.parent !== window) {
           window.parent.dispatchEvent(storageEvent);
+        }
+        
+        // Trigger API key specific event
+        var customEvent = new CustomEvent('feedbackDataUpdated-' + this.config.apiKey);
+        window.dispatchEvent(customEvent);
+        if (window.parent && window.parent !== window) {
+          window.parent.dispatchEvent(customEvent);
         }
         
         this.loadFeedbackData();
@@ -694,13 +716,13 @@
     // Listen for storage changes from main app
     var self = this;
     window.addEventListener('storage', function(e) {
-      if (e.key === 'feedback-requests') {
+      if (e.key === 'feedback-api-data-' + self.config.apiKey) {
         self.loadFeedbackData();
       }
     });
     
-    // Also listen for custom events from main app
-    window.addEventListener('feedbackDataUpdated', function() {
+    // Listen for API key specific events from main app
+    window.addEventListener('feedbackDataUpdated-' + this.config.apiKey, function() {
       self.loadFeedbackData();
     });
     

@@ -155,8 +155,7 @@ export const Header: React.FC<HeaderProps> = ({
     apiKey: '${apiKey}',
     position: 'bottom-right',
     primaryColor: '#3B82F6',
-    title: 'Feedback',
-    apiEndpoint: 'https://verdant-panda-798257.netlify.app/api'
+    title: 'Feedback'
   });
 </script>`}
                   </pre>

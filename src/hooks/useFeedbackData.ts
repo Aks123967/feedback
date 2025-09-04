@@ -6,10 +6,21 @@ import toast from 'react-hot-toast';
 
 const STORAGE_KEY = 'feedback-requests';
 const API_KEYS_STORAGE_KEY = 'feedback-api-keys';
+const API_DATA_STORAGE_KEY = 'feedback-api-data';
 
-const loadFromStorage = (): FeatureRequest[] => {
+const loadFromStorage = (apiKey?: string): FeatureRequest[] => {
   try {
-    const stored = localStorage.getItem(STORAGE_KEY);
+    let stored;
+    if (apiKey) {
+      // Load data specific to this API key
+      const apiData = localStorage.getItem(API_DATA_STORAGE_KEY);
+      const allApiData = apiData ? JSON.parse(apiData) : {};
+      stored = JSON.stringify(allApiData[apiKey] || []);
+    } else {
+      // Load global data (for admin view)
+      stored = localStorage.getItem(STORAGE_KEY);
+    }
+    
     if (stored) {
       const parsed = JSON.parse(stored);
       // Convert date strings back to Date objects
@@ -30,12 +41,30 @@ const loadFromStorage = (): FeatureRequest[] => {
   } catch (error) {
     console.error('Error loading from localStorage:', error);
   }
-  return mockFeatureRequests;
+  return apiKey ? [] : mockFeatureRequests;
 };
 
-const saveToStorage = (requests: FeatureRequest[]) => {
+const saveToStorage = (requests: FeatureRequest[], apiKey?: string) => {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(requests));
+    if (apiKey) {
+      // Save data specific to this API key
+      const apiData = localStorage.getItem(API_DATA_STORAGE_KEY);
+      const allApiData = apiData ? JSON.parse(apiData) : {};
+      allApiData[apiKey] = requests;
+      localStorage.setItem(API_DATA_STORAGE_KEY, JSON.stringify(allApiData));
+      
+      // Also trigger storage event for this specific API key
+      const storageEvent = new StorageEvent('storage', {
+        key: `${API_DATA_STORAGE_KEY}-${apiKey}`,
+        newValue: JSON.stringify(requests),
+        storageArea: localStorage,
+        url: window.location.href
+      });
+      window.dispatchEvent(storageEvent);
+    } else {
+      // Save global data (for admin view)
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(requests));
+    }
   } catch (error) {
     console.error('Error saving to localStorage:', error);
   }
@@ -53,6 +82,12 @@ const getOrCreateApiKey = (userId: string): string => {
     if (!apiKeys[userId]) {
       apiKeys[userId] = generateApiKey();
       localStorage.setItem(API_KEYS_STORAGE_KEY, JSON.stringify(apiKeys));
+      
+      // Initialize empty data for this new API key
+      const apiData = localStorage.getItem(API_DATA_STORAGE_KEY);
+      const allApiData = apiData ? JSON.parse(apiData) : {};
+      allApiData[apiKeys[userId]] = [];
+      localStorage.setItem(API_DATA_STORAGE_KEY, JSON.stringify(allApiData));
     }
     
     return apiKeys[userId];
@@ -62,19 +97,29 @@ const getOrCreateApiKey = (userId: string): string => {
   }
 };
 
-export const useFeedbackData = () => {
-  const [featureRequests, setFeatureRequests] = useState<FeatureRequest[]>(loadFromStorage);
+// Get data for a specific API key
+const getApiKeyData = (apiKey: string): FeatureRequest[] => {
+  return loadFromStorage(apiKey);
+};
+
+// Save data for a specific API key
+const saveApiKeyData = (apiKey: string, requests: FeatureRequest[]) => {
+  saveToStorage(requests, apiKey);
+};
+export const useFeedbackData = (apiKey?: string) => {
+  const [featureRequests, setFeatureRequests] = useState<FeatureRequest[]>(loadFromStorage(apiKey));
   const [labels] = useState(mockLabels);
 
   // Save to localStorage whenever featureRequests changes
   useEffect(() => {
-    saveToStorage(featureRequests);
-  }, [featureRequests]);
+    saveToStorage(featureRequests, apiKey);
+  }, [featureRequests, apiKey]);
 
   // Listen for storage changes from widget
   useEffect(() => {
     const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === STORAGE_KEY && e.newValue) {
+      const targetKey = apiKey ? `${API_DATA_STORAGE_KEY}-${apiKey}` : STORAGE_KEY;
+      if (e.key === targetKey && e.newValue) {
         try {
           const parsed = JSON.parse(e.newValue);
           const converted = parsed.map((req: any) => ({
@@ -99,17 +144,25 @@ export const useFeedbackData = () => {
 
     const handleCustomFeedbackUpdate = () => {
       // Reload data when custom event is triggered
-      const reloaded = loadFromStorage();
+      const reloaded = loadFromStorage(apiKey);
       setFeatureRequests(reloaded);
     };
     window.addEventListener('storage', handleStorageChange);
     window.addEventListener('feedbackDataUpdated', handleCustomFeedbackUpdate);
     
+    // Listen for API key specific events
+    if (apiKey) {
+      window.addEventListener(`feedbackDataUpdated-${apiKey}`, handleCustomFeedbackUpdate);
+    }
+    
     return () => {
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('feedbackDataUpdated', handleCustomFeedbackUpdate);
+      if (apiKey) {
+        window.removeEventListener(`feedbackDataUpdated-${apiKey}`, handleCustomFeedbackUpdate);
+      }
     };
-  }, []);
+  }, [apiKey]);
 
   const addFeatureRequest = useCallback((request: Omit<FeatureRequest, 'id' | 'createdAt' | 'updatedAt' | 'upvotes' | 'comments'>) => {
     const newRequest: FeatureRequest = {
@@ -124,10 +177,13 @@ export const useFeedbackData = () => {
     
     // Trigger custom event for widgets
     window.dispatchEvent(new CustomEvent('feedbackDataUpdated'));
+    if (apiKey) {
+      window.dispatchEvent(new CustomEvent(`feedbackDataUpdated-${apiKey}`));
+    }
     
     toast.success('Feature request created successfully!');
     return newRequest;
-  }, []);
+  }, [apiKey]);
 
   const updateFeatureRequest = useCallback((id: string, updates: Partial<FeatureRequest>) => {
     setFeatureRequests(prev => prev.map(req => 
@@ -138,18 +194,24 @@ export const useFeedbackData = () => {
     
     // Trigger custom event for widgets
     window.dispatchEvent(new CustomEvent('feedbackDataUpdated'));
+    if (apiKey) {
+      window.dispatchEvent(new CustomEvent(`feedbackDataUpdated-${apiKey}`));
+    }
     
     toast.success('Feature request updated successfully!');
-  }, []);
+  }, [apiKey]);
 
   const deleteFeatureRequest = useCallback((id: string) => {
     setFeatureRequests(prev => prev.filter(req => req.id !== id));
     
     // Trigger custom event for widgets
     window.dispatchEvent(new CustomEvent('feedbackDataUpdated'));
+    if (apiKey) {
+      window.dispatchEvent(new CustomEvent(`feedbackDataUpdated-${apiKey}`));
+    }
     
     toast.success('Feature request deleted successfully!');
-  }, []);
+  }, [apiKey]);
 
   const addComment = useCallback((requestId: string, comment: Omit<Comment, 'id' | 'createdAt'>) => {
     const newComment: Comment = {
@@ -166,12 +228,15 @@ export const useFeedbackData = () => {
     
     // Trigger custom event for widgets
     window.dispatchEvent(new CustomEvent('feedbackDataUpdated'));
+    if (apiKey) {
+      window.dispatchEvent(new CustomEvent(`feedbackDataUpdated-${apiKey}`));
+    }
     
     // Only show toast in admin view, not in public view
     if (comment.author !== 'Anonymous User') {
       toast.success('Comment added successfully!');
     }
-  }, []);
+  }, [apiKey]);
 
   const addUpvote = useCallback((requestId: string, upvote: Omit<Upvote, 'id' | 'createdAt'>) => {
     const newUpvote: Upvote = {
@@ -188,12 +253,15 @@ export const useFeedbackData = () => {
     
     // Trigger custom event for widgets
     window.dispatchEvent(new CustomEvent('feedbackDataUpdated'));
+    if (apiKey) {
+      window.dispatchEvent(new CustomEvent(`feedbackDataUpdated-${apiKey}`));
+    }
     
     // Only show toast in admin view, not in public view
     if (upvote.userName !== 'Anonymous User') {
       toast.success('Upvote added successfully!');
     }
-  }, []);
+  }, [apiKey]);
 
   const removeUpvote = useCallback((requestId: string, userId: string) => {
     setFeatureRequests(prev => prev.map(req => 
@@ -204,9 +272,12 @@ export const useFeedbackData = () => {
     
     // Trigger custom event for widgets
     window.dispatchEvent(new CustomEvent('feedbackDataUpdated'));
+    if (apiKey) {
+      window.dispatchEvent(new CustomEvent(`feedbackDataUpdated-${apiKey}`));
+    }
     
     toast.success('Upvote removed successfully!');
-  }, []);
+  }, [apiKey]);
 
   const filterRequests = useCallback((requests: FeatureRequest[], filters: FilterState) => {
     let filtered = [...requests];
@@ -261,5 +332,7 @@ export const useFeedbackData = () => {
     removeUpvote,
     filterRequests,
     getOrCreateApiKey,
+    getApiKeyData,
+    saveApiKeyData,
   };
 };
