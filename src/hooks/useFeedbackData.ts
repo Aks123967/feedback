@@ -320,6 +320,7 @@ export const useFeedbackData = (apiKey?: string) => {
         case 'newest':
         default:
           return b.createdAt.getTime() - a.createdAt.getTime();
+      }
       const updated = [newRequest, ...prev];
       console.log('Updated requests:', updated);
       return updated;
