@@ -61,7 +61,7 @@ export const Header: React.FC<HeaderProps> = ({
       <div className="px-6 py-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">{title}</h1>
+            <h1>{title}</h1>
             {subtitle && (
               <p className="text-gray-600 mt-1">{subtitle}</p>
             )}
@@ -69,10 +69,10 @@ export const Header: React.FC<HeaderProps> = ({
           
           <div className="flex items-center space-x-3">
             {/* User Info */}
-            <div className="flex items-center space-x-2 px-3 py-2 bg-gray-50 rounded-lg">
+            <div className="flex items-center space-x-2 px-3 py-2 bg-gradient-to-r from-violet-50 to-indigo-50 rounded-xl">
               <UserCircleIcon className="w-5 h-5 text-gray-600" />
               <span className="text-sm font-medium text-gray-700">{user?.name}</span>
-              <span className="text-xs text-gray-500 bg-gray-200 px-2 py-1 rounded-full">
+              <span className="text-xs text-violet-600 bg-violet-100 px-2 py-1 rounded-full font-medium">
                 {user?.role}
               </span>
             </div>

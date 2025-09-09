@@ -50,13 +50,13 @@ export const LoginForm: React.FC = () => {
     });
   };
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
+    <div className="min-h-screen bg-gradient-to-br from-violet-50 via-indigo-50 to-blue-50 flex items-center justify-center p-4">
+      <div className="card w-full max-w-md slide-up">
         <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-gradient-primary rounded-2xl flex items-center justify-center mx-auto mb-4">
+          <div className="w-16 h-16 bg-gradient-to-r from-violet-600 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
             <LockClosedIcon className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Welcome Back</h1>
+          <h1 className="mb-2">Welcome Back</h1>
           <p className="text-gray-600">
             {isSignupMode ? 'Create your account' : 'Sign in to access the admin dashboard'}
           </p>

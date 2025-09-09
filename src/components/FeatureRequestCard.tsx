@@ -15,12 +15,12 @@ export const FeatureRequestCard: React.FC<FeatureRequestCardProps> = ({
 }) => {
   return (
     <div
-      className="bg-white rounded-lg border border-gray-200 p-6 hover:shadow-md transition-shadow cursor-pointer"
+      className="card cursor-pointer scale-in"
       onClick={onClick}
     >
       <div className="flex items-start justify-between">
         <div className="flex-1">
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">{request.title}</h3>
+          <h3 className="text-lg font-semibold bg-gradient-to-r from-gray-900 to-gray-700 text-transparent bg-clip-text mb-2">{request.title}</h3>
           <p className="text-gray-600 text-sm mb-4 line-clamp-2">{request.summary}</p>
           
           <div className="flex items-center space-x-4 text-sm text-gray-500 mb-4">

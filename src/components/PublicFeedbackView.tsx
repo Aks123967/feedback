@@ -264,7 +264,7 @@ export const PublicFeedbackView: React.FC<PublicFeedbackViewProps> = ({ isWidget
         {publicRequests.map(request => (
           <div
             key={request.id}
-            className="flex items-start space-x-3 p-3 border border-gray-200 rounded-lg hover:shadow-sm transition-shadow cursor-pointer"
+            className="flex items-start space-x-3 p-4 bg-white rounded-xl border border-gray-100 hover:shadow-lg transition-all duration-300 cursor-pointer hover:-translate-y-0.5 scale-in"
             onClick={() => setSelectedRequest(request)}
           >
             <div className="flex flex-col items-center">
@@ -273,15 +273,15 @@ export const PublicFeedbackView: React.FC<PublicFeedbackViewProps> = ({ isWidget
                   e.stopPropagation();
                   handleUpvote(request.id);
                 }}
-                className="flex flex-col items-center p-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+                className="flex flex-col items-center p-1.5 rounded-xl border border-gray-200 hover:bg-gradient-to-r hover:from-violet-50 hover:to-indigo-50 transition-all duration-300 hover:scale-105"
               >
-                <ChevronUpIcon className="w-4 h-4 text-gray-600" />
-                <span className="text-sm font-bold text-gray-900">{request.upvotes.length}</span>
+                <ChevronUpIcon className="w-4 h-4 text-violet-600" />
+                <span className="text-sm font-bold bg-gradient-to-r from-violet-600 to-indigo-600 text-transparent bg-clip-text">{request.upvotes.length}</span>
               </button>
             </div>
             
             <div className="flex-1 min-w-0">
-              <h3 className="font-semibold text-gray-900 mb-1 text-sm">{request.title}</h3>
+              <h3 className="font-semibold bg-gradient-to-r from-gray-900 to-gray-700 text-transparent bg-clip-text mb-1 text-sm">{request.title}</h3>
               <div className="flex items-center space-x-3 text-xs text-gray-500 mb-2">
                 <span>{formatDistanceToNow(request.createdAt, { addSuffix: true })}</span>
                 <div className="flex items-center space-x-1">
