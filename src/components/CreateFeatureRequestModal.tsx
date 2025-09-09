@@ -47,13 +47,16 @@ export const CreateFeatureRequestModal: React.FC<CreateFeatureRequestModalProps>
       formData.selectedLabels.includes(label.id)
     );
 
-    onSubmit({
+    const newRequest = onSubmit({
       title: formData.title,
       summary: formData.summary,
       status: formData.status,
       author: formData.author,
       labels: selectedLabelObjects,
     });
+
+    // Show success message
+    toast.success('Feature request created successfully!');
 
     // Reset form
     setFormData({

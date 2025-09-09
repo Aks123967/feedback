@@ -165,6 +165,8 @@ export const useFeedbackData = (apiKey?: string) => {
   }, [apiKey]);
 
   const addFeatureRequest = useCallback((request: Omit<FeatureRequest, 'id' | 'createdAt' | 'updatedAt' | 'upvotes' | 'comments'>) => {
+    console.log('Adding feature request:', request);
+    
     const newRequest: FeatureRequest = {
       ...request,
       id: Date.now().toString(),
@@ -173,6 +175,9 @@ export const useFeedbackData = (apiKey?: string) => {
       upvotes: [],
       comments: [],
     };
+    
+    console.log('New request created:', newRequest);
+    
     setFeatureRequests(prev => [newRequest, ...prev]);
     
     // Trigger custom event for widgets
@@ -181,7 +186,7 @@ export const useFeedbackData = (apiKey?: string) => {
       window.dispatchEvent(new CustomEvent(`feedbackDataUpdated-${apiKey}`));
     }
     
-    toast.success('Feature request created successfully!');
+    // Don't show toast here as it's handled in the components
     return newRequest;
   }, [apiKey]);
 
@@ -315,7 +320,9 @@ export const useFeedbackData = (apiKey?: string) => {
         case 'newest':
         default:
           return b.createdAt.getTime() - a.createdAt.getTime();
-      }
+      const updated = [newRequest, ...prev];
+      console.log('Updated requests:', updated);
+      return updated;
     });
 
     return filtered;

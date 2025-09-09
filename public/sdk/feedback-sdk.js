@@ -583,6 +583,8 @@
   // Save to API key specific storage
   FeedbackSDK.prototype.saveToApiKeyStorage = function(newFeedback) {
     try {
+      console.log('Saving to API key storage:', this.config.apiKey, newFeedback);
+      
       var apiDataKey = 'feedback-api-data';
       var stored = localStorage.getItem(apiDataKey);
       var allApiData = stored ? JSON.parse(stored) : {};
@@ -602,12 +604,16 @@
         comments: newFeedback.comments || []
       };
       
+      console.log('Complete feedback object:', completeFeedback);
+      
       // Add new feedback
       apiKeyData.unshift(completeFeedback);
       allApiData[this.config.apiKey] = apiKeyData;
       
       // Save back to API key storage
       localStorage.setItem(apiDataKey, JSON.stringify(allApiData));
+      
+      console.log('Saved to localStorage:', allApiData);
       
       // Trigger storage event for cross-window communication
       var storageEvent = new StorageEvent('storage', {
@@ -949,7 +955,9 @@
       comments: []
     };
     
+    console.log('Saving feedback:', newFeedback);
     this.saveFeedbackData(newFeedback);
+    console.log('Feedback saved, showing success message');
     alert('Thank you for your feedback!');
     this.showFeedbackList();
   };

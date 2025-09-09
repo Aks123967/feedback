@@ -63,7 +63,9 @@ export const PublicFeedbackView: React.FC<PublicFeedbackViewProps> = ({ isWidget
 
   const handleSubmitIdea = (e: React.FormEvent) => {
     e.preventDefault();
+    
     if (!formData.title.trim() || !formData.description.trim()) {
+      alert('Please fill in both title and description');
       return;
     }
 
@@ -71,13 +73,16 @@ export const PublicFeedbackView: React.FC<PublicFeedbackViewProps> = ({ isWidget
       ? labels.find(label => label.id === formData.selectedLabelId)
       : null;
     
-    addFeatureRequest({
+    const newRequest = addFeatureRequest({
       title: formData.title,
       summary: formData.description,
       status: 'public',
       author: 'Anonymous User',
       labels: selectedLabel ? [selectedLabel] : [],
     });
+
+    // Show success message
+    alert('Thank you for your feedback!');
 
     setFormData({ title: '', description: '', selectedLabelId: '' });
     setShowCreateForm(false);
